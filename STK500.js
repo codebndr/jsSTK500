@@ -82,52 +82,54 @@ var STK500 = {
 	portReadReady: function() { console.log('STK500.portReadReady needs to be overwritten'); }, // overwrite this method for serial specific implementation
 	
 	
+	
 	initialize: function() {
 		console.log("STK500 initialize()");
 		this.currentState = this.states.INITIALIZING;
 		
 		// TODO basic reset/initialize stuff here
-		this.setDTR_RTS(false);
-		
-		// this is pretty ghetto, but its the only way to have "sleeping"
 		setTimeout(function() {
-			this.setDTR_RTS(true);
-			
+			// object is used literally instead of "this", when using timeout callbacks
+			STK500.setDTR_RTS(false);
+		
+			// this is pretty ghetto, but its the only way to have "sleeping"
 			setTimeout(function() {
-				this.flush();
+				STK500.setDTR_RTS(true);
+			
+				setTimeout(function() {
+					STK500.flush();
 				
-				// get in sync
-				var buffer = [this.constants.STK_GET_SYNC, this.constants.CRC_EOP];
+					// get in sync
+					var buffer = [STK500.constants.STK_GET_SYNC, STK500.constants.CRC_EOP];
 				
-				// update our currentCommand to GET_SYNC
-				this.currentCommand = this.constants.STK_GET_SYNC;
+					// update our currentCommand to GET_SYNC
+					STK500.currentCommand = STK500.constants.STK_GET_SYNC;
 				
-				// first send and flush a few times (yes.. they actually do this in avrdude...)
-				this.send(buffer);
-				this.flush();
-				this.send(buffer);
-				this.flush();
+					// first send and flush a few times (yes.. they actually do this in avrdude...)
+					STK500.send(buffer);
+					STK500.flush();
+					STK500.send(buffer);
+					STK500.flush();
 				
-				this.portReadReady(); // now we care about read callbacks
-				this.send(buffer);
+					STK500.portReadReady(); // now we care about read callbacks
 				
-				// update our state
-				this.currentState = this.states.WAITING;
-				
+					// update our state
+					STK500.currentState = STK500.states.WAITING;
+					STK500.send(buffer);
+				}, 500);
 			}, 500);
 		}, 500);
 	},
 	
 	flush: function() {
 		this.portFlush();
-	}
+	},
 	
 	setDTR_RTS: function(state) {
 		this.portSetDTR_RTS(state);
-	}
+	},
 	
 	send: function(data) {
-		// send wrapper shit... ultimately calls portSend
 		this.portSend(data);
 	},
 	
@@ -165,7 +167,11 @@ var chromeSerialReadReady = function() {
 		console.log("chromeSerialReadReady() called without active port");
 		return;
 	}
-			
+	
+	if (serialLogging = true) {
+		console.log('chromeSerialReadReady()');
+	}
+	
 	// setup our read callback
 	chrome.serial.read(protocol.port.connectionId, 128, chromeSerialRead);
 };
@@ -198,13 +204,22 @@ var chromeSerialWrite = function(writeData) {
 		console.log('chromeSerialWrite(): ' +  bufferToString(writeData));
 	}
 	
-	chrome.serial.write(protocol.port.connectionId, writeData, function() {}); 
+	// convert array in to a binary array as expected by chrome.serial.write
+	var data = new ArrayBuffer(writeData.length);
+	var dataView = new Uint8Array(data, 0, writeData.length);
+	dataView.set(writeData, 0);
+	
+	chrome.serial.write(protocol.port.connectionId, data, function() {}); 
 };
 
 var chromeSerialFlush = function() {
 	if (!protocol.port) {
 		console.log("chromeSerialFlush() called without active port");
 		return;
+	}
+	
+	if (serialLogging = true) {
+		console.log('chromeSerialFlush()');
 	}
 	
 	chrome.serial.flush(protocol.port.connectionId, function() {});
@@ -216,6 +231,10 @@ var chromeSerialSetDTR_RTS = function(state) {
 		return;
 	}
 	
+	if (serialLogging = true) {
+		console.log('chromeSerialSetDTR_RTS(): ' + state);
+	}
+	
 	chrome.serial.setControlSignals(protocol.port.connectionId, { dtr: state, rts: state}, function() {});
 };
 
@@ -223,6 +242,10 @@ var chromeSerialClose = function() {
 	if (!protocol.port) {
 		console.log("chromeSerialClose() called without active port");
 		return;
+	}
+	
+	if (serialLogging = true) {
+		console.log('chromeSerialClose()');
 	}
 	
 	chrome.serial.close(protocol.port.connectionId, function() {});
