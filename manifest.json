@@ -1,0 +1,12 @@
+{
+  "name": "Javascript STK500 Programmer",
+  "version": "0.1",
+  "manifest_version": 2,
+  "minimum_chrome_version": "23",
+  "app": {
+    "background": {
+      "scripts": ["main.js"]
+    }
+  },
+  "permissions": ["serial"]
+}

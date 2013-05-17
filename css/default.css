@@ -1,0 +1,35 @@
+html {
+	font-size: 16px;
+}
+
+body {
+	font-family: 'Helvetica';
+}
+
+h1 {
+	margin-top: 10px;
+	margin-bottom: 5px;
+	font-size: 30px;
+	color: #343433;
+	text-align: center;
+	line-height: 1.2em;
+}
+
+h1 > .lightGray {
+	color: #CCCBCB;
+}
+
+h2 {
+	margin-bottom: 20px;
+	font-size: 18px;
+	color: #343433;
+	text-align: center;
+}
+
+h3 {
+	font-size: 16px;
+}
+
+h4 {
+	font-size: 14px;
+}
