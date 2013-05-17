@@ -1,4 +1,4 @@
-jsSTK500 - Javascript STK500 protocol implementation
+Javascript STK500 protocol implementation
 ===================
 
 Chrome App for programming Arduino compatible boards!
