@@ -57,8 +57,8 @@ var STK500 = {
 	port:  						false,
 	baudrate: 					115200,
 	
-	description: 				'',
-	type: 						'',
+	description: 				"",
+	type: 						"",
 	
 	maximumSize: 				126976,
 	
@@ -75,24 +75,23 @@ var STK500 = {
 	currentCommand: 			0, // this keeps track of current command for read callback purposes
 	
 	// methods
-	portSend: function(data) { console.log('STK500.portSend needs to be overwritten'); }, // overwrite this method for serial specific implementation
-	portFlush: function() { console.log('STK500.portFlush needs to be overwritten'); }, // overwrite this method for serial specific implementation
-	portSetDTR_RTS: function() { console.log('STK500.portSetDTR_RTS needs to be overwritten'); }, // overwrite this method for serial specific implementation
-	portClose: function() { console.log('STK500.portClose needs to be overwritten'); }, // overwrite this method for serial specific implementation
-	portReadReady: function() { console.log('STK500.portReadReady needs to be overwritten'); }, // overwrite this method for serial specific implementation
+	portSend: function(data) { console.log("STK500.portSend needs to be overwritten"); }, // overwrite this method for serial specific implementation
+	portFlush: function() { console.log("STK500.portFlush needs to be overwritten"); }, // overwrite this method for serial specific implementation
+	portSetDTR_RTS: function() { console.log("STK500.portSetDTR_RTS needs to be overwritten"); }, // overwrite this method for serial specific implementation
+	portClose: function() { console.log("STK500.portClose needs to be overwritten"); }, // overwrite this method for serial specific implementation
+	portReadReady: function() { console.log("STK500.portReadReady needs to be overwritten"); }, // overwrite this method for serial specific implementation
 	
 	
 	
 	initialize: function() {
 		console.log("STK500 initialize()");
-		this.currentState = this.states.INITIALIZING;
+		STK500.currentState = this.states.INITIALIZING;
 		
-		// TODO basic reset/initialize stuff here
+		// this setTimeout stuff is pretty ghetto, but its the only way to have "sleeping"
 		setTimeout(function() {
 			// object is used literally instead of "this", when using timeout callbacks
 			STK500.setDTR_RTS(false);
 		
-			// this is pretty ghetto, but its the only way to have "sleeping"
 			setTimeout(function() {
 				STK500.setDTR_RTS(true);
 			
@@ -115,6 +114,8 @@ var STK500 = {
 				
 					// update our state
 					STK500.currentState = STK500.states.WAITING;
+					
+					// send the sync request for the last time, and wait for the recieve callback to fire
 					STK500.send(buffer);
 				}, 500);
 			}, 500);
@@ -122,26 +123,26 @@ var STK500 = {
 	},
 	
 	flush: function() {
-		this.portFlush();
+		STK500.portFlush();
 	},
 	
 	setDTR_RTS: function(state) {
-		this.portSetDTR_RTS(state);
+		STK500.portSetDTR_RTS(state);
 	},
 	
 	send: function(data) {
-		this.portSend(data);
+		STK500.portSend(data);
 	},
 	
 	recieve: function(data) {
-		if (this.currentState == this.states.INITIALIZING) {
-			console.log('STK500 recieve() recieving data in an unready state...');
+		if (STK500.currentState == STK500.states.INITIALIZING) {
+			console.log("STK500 recieve() recieving data in an unready state...");
 			return;
 		}
 		
 		// do something with data... this method will be huge initially, then broken up later
-		switch (this.currentCommand) {
-			case this.constants.STK_GET_SYNC:
+		switch (STK500.currentCommand) {
+			case STK500.constants.STK_GET_SYNC:
 				
 				break;
 		}
@@ -160,7 +161,7 @@ var protocol = STK500;
 var serialLogging = true;
 
 
-console.log('starting up!');
+console.log("starting up!");
 
 var chromeSerialReadReady = function() {
 	if (!protocol.port) {
@@ -169,7 +170,7 @@ var chromeSerialReadReady = function() {
 	}
 	
 	if (serialLogging = true) {
-		console.log('chromeSerialReadReady()');
+		console.log("chromeSerialReadReady()");
 	}
 	
 	// setup our read callback
@@ -184,7 +185,7 @@ var chromeSerialRead = function(readData) {
 	
 	if (readData && readData.bytesRead > 0 && readData.data) {
 		if (serialLogging = true) {
-			console.log('chromeSerialRead(): ' +  bufferToString(readData.data));
+			console.log("chromeSerialRead(): " +  bufferToString(readData.data));
 		}
 		
 		// call the actual protocol recieve method
@@ -201,7 +202,7 @@ var chromeSerialWrite = function(writeData) {
 	}
 	
 	if (serialLogging = true) {
-		console.log('chromeSerialWrite(): ' +  bufferToString(writeData));
+		console.log("chromeSerialWrite(): " +  bufferToString(writeData));
 	}
 	
 	// convert array in to a binary array as expected by chrome.serial.write
@@ -219,7 +220,7 @@ var chromeSerialFlush = function() {
 	}
 	
 	if (serialLogging = true) {
-		console.log('chromeSerialFlush()');
+		console.log("chromeSerialFlush()");
 	}
 	
 	chrome.serial.flush(protocol.port.connectionId, function() {});
@@ -232,7 +233,7 @@ var chromeSerialSetDTR_RTS = function(state) {
 	}
 	
 	if (serialLogging = true) {
-		console.log('chromeSerialSetDTR_RTS(): ' + state);
+		console.log("chromeSerialSetDTR_RTS(): " + state);
 	}
 	
 	chrome.serial.setControlSignals(protocol.port.connectionId, { dtr: state, rts: state}, function() {});
@@ -245,7 +246,7 @@ var chromeSerialClose = function() {
 	}
 	
 	if (serialLogging = true) {
-		console.log('chromeSerialClose()');
+		console.log("chromeSerialClose()");
 	}
 	
 	chrome.serial.close(protocol.port.connectionId, function() {});
@@ -271,9 +272,9 @@ chrome.serial.getPorts(function(ports) {
 		return (!port.match(/[Bb]luetooth/) && port.match(/tty/));
 	});
 	
-	console.log('ports:');
-	for (var i=0; i < eligiblePorts.length; i++) {
-	    console.log('\t' + eligiblePorts[i]);
+	console.log("ports:");
+	for (var i = 0; i < eligiblePorts.length; i++) {
+	    console.log("\t" + eligiblePorts[i]);
 	}
 
 	// TODO currently hardcoding to the first found port
@@ -303,3 +304,4 @@ chrome.serial.getPorts(function(ports) {
 		protocol.initialize();
 	});
 });
+
