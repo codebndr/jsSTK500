@@ -85,7 +85,7 @@ var STK500 = {
 	
 	initialize: function() {
 		console.log("STK500 initialize()");
-		STK500.currentState = this.states.INITIALIZING;
+		STK500.currentState = STK500.states.INITIALIZING;
 		
 		// this setTimeout stuff is pretty ghetto, but its the only way to have "sleeping"
 		setTimeout(function() {
