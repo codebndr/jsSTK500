@@ -39,7 +39,10 @@ var STK500 = {
 		STK_READ_SIGN: 			0x75,  // 'u'
 		STK_READ_OSCCAL: 		0x76,  // 'v'
 		STK_READ_FUSE_EXT: 		0x77,  // 'w'
-		STK_READ_OSCCAL_EXT: 	0x78   // 'x'
+		STK_READ_OSCCAL_EXT: 	0x78,  // 'x'
+		STK_HW_VER: 			0x80,
+		STK_SW_MAJOR: 			0x81,
+		STK_SW_MINOR: 			0x82
 	},
 	
 	states: {
@@ -55,7 +58,7 @@ var STK500 = {
 	
 	// states + settings
 	port:  						false,
-	baudrate: 					115200,
+	baudrate: 					57600,
 	
 	description: 				"",
 	type: 						"",
@@ -72,55 +75,27 @@ var STK500 = {
 	
 	
 	currentState: 				0,
-	currentCommand: 			0, // this keeps track of current command for read callback purposes
+	
+	// board info
+	hardwareVersion: 			0,
+	versionMajor: 				0,
+	versionMinor: 				0,
+	
+	
+	
+	
+	// callback holders
+	recieveCallback: 			false,
+	initializeCallback: 		false,
+	getParmCallback: 			false,
 	
 	// methods
 	portSend: function(data) { console.log("STK500.portSend needs to be overwritten"); }, // overwrite this method for serial specific implementation
 	portFlush: function() { console.log("STK500.portFlush needs to be overwritten"); }, // overwrite this method for serial specific implementation
 	portSetDTR_RTS: function() { console.log("STK500.portSetDTR_RTS needs to be overwritten"); }, // overwrite this method for serial specific implementation
 	portClose: function() { console.log("STK500.portClose needs to be overwritten"); }, // overwrite this method for serial specific implementation
-	portReadReady: function() { console.log("STK500.portReadReady needs to be overwritten"); }, // overwrite this method for serial specific implementation
+	portReadCallbackArm: function(dataLen) { console.log("STK500.portReadCallbackArm needs to be overwritten"); }, // overwrite this method for serial specific implementation
 	
-	
-	
-	initialize: function() {
-		console.log("STK500 initialize()");
-		STK500.currentState = STK500.states.INITIALIZING;
-		
-		// this setTimeout stuff is pretty ghetto, but its the only way to have "sleeping"
-		setTimeout(function() {
-			// object is used literally instead of "this", when using timeout callbacks
-			STK500.setDTR_RTS(false);
-		
-			setTimeout(function() {
-				STK500.setDTR_RTS(true);
-			
-				setTimeout(function() {
-					STK500.flush();
-				
-					// get in sync
-					var buffer = [STK500.constants.STK_GET_SYNC, STK500.constants.CRC_EOP];
-				
-					// update our currentCommand to GET_SYNC
-					STK500.currentCommand = STK500.constants.STK_GET_SYNC;
-				
-					// first send and flush a few times (yes.. they actually do this in avrdude...)
-					STK500.send(buffer);
-					STK500.flush();
-					STK500.send(buffer);
-					STK500.flush();
-				
-					STK500.portReadReady(); // now we care about read callbacks
-				
-					// update our state
-					STK500.currentState = STK500.states.WAITING;
-					
-					// send the sync request for the last time, and wait for the recieve callback to fire
-					STK500.send(buffer);
-				}, 500);
-			}, 500);
-		}, 500);
-	},
 	
 	flush: function() {
 		STK500.portFlush();
@@ -130,26 +105,128 @@ var STK500 = {
 		STK500.portSetDTR_RTS(state);
 	},
 	
-	send: function(data) {
+	send: function(data, recieveCallback) {
+		if (typeof recieveCallback == 'function') {
+			STK500.recieveCallback = recieveCallback;
+		}
+		
 		STK500.portSend(data);
 	},
 	
 	recieve: function(data) {
-		if (STK500.currentState == STK500.states.INITIALIZING) {
-			console.log("STK500 recieve() recieving data in an unready state...");
-			return;
+		if (typeof STK500.recieveCallback == 'function') {
+			// move method to local scope and reset the callback var
+			var callbackHolder = STK500.recieveCallback;
+			STK500.recieveCallback = false;
+			
+			callbackHolder(data);
+		} else {
+			// global handling of recieved data goes here... i think...
 		}
-		
-		// do something with data... this method will be huge initially, then broken up later
-		switch (STK500.currentCommand) {
-			case STK500.constants.STK_GET_SYNC:
-				
-				break;
-		}
-		
-		
-		
 	},
+	
+	getParm: function(parm, callback) {
+		console.log("STK500 getParm(" + parm + ")");
+		
+		if (typeof callback == 'function') {
+			STK500.getParmCallback = callback;
+		}
+		
+		var buffer = new Uint8Array(3);
+		buffer[0] = STK500.constants.STK_GET_PARAMETER;
+		buffer[1] = parm;
+		buffer[2] = STK500.constants.CRC_EOP;
+		
+		STK500.portReadCallbackArm(3); 
+		
+		STK500.send(buffer, function(buffer) {
+			var data = new Uint8Array(buffer);
+						
+			if (data[0] == STK500.constants.STK_NOSYNC) {
+				console.log("STK500 getParm() no sync");
+				return;
+			} else if (data[0] != STK500.constants.STK_INSYNC) {
+				console.log("STK500 getParm() protocol error,  expect=" + STK500.constants.STK_INSYNC +", resp=" + data[0]);
+				return;
+			}
+			
+			if (typeof STK500.getParmCallback == 'function') {
+				STK500.getParmCallback(data[1]);
+			}
+		});
+ 		
+	},
+	
+	initialize: function(callback) {
+		console.log("STK500 initialize()");
+		// attach the initialize callback if one is passed
+		if (typeof callback == 'function') {
+			STK500.initializeCallback = callback;
+		}
+		
+		STK500.currentState = STK500.states.INITIALIZING;
+				
+		// this setTimeout stuff is pretty ghetto, but its the only way to have "sleeping"
+		setTimeout(function() {
+			// object is used literally instead of "this", when using timeout callbacks
+			STK500.setDTR_RTS(false);
+		
+			setTimeout(function() {
+				STK500.setDTR_RTS(true);
+				
+				setTimeout(function() {
+					// get in sync
+					//var buffer = [STK500.constants.STK_GET_SYNC, STK500.constants.CRC_EOP];
+					var buffer = new Uint8Array(2);
+					buffer[0] = STK500.constants.STK_GET_SYNC;
+					buffer[1] = STK500.constants.CRC_EOP;
+				
+					// first send and flush a few times (yes.. they actually do this in avrdude...)
+					STK500.send(buffer);
+					STK500.send(buffer);
+										
+					// update our state
+					STK500.currentState = STK500.states.WAITING;
+					STK500.portReadCallbackArm(2); // enable the serial port read callback, with 2 byte length
+				
+					// send the sync request for the last time, and wait for the recieve callback to fire
+					STK500.send(buffer, function(buffer) {
+						var data = new Uint8Array(buffer);
+						
+						if (data[0] != STK500.constants.STK_INSYNC) {
+							console.log("STK500 initialize() not in sync: resp=" + data[0]);
+							return;
+						}
+						if (data[1] != STK500.constants.STK_OK) {
+							console.log("STK500 initialize() can't communicate with device: resp=" + data[1]);
+							return;
+						}
+						
+						
+						// making this more like stk500_display for verbosity 
+						STK500.getParm(STK500.constants.STK_HW_VER, function(data) {
+							STK500.hardwareVersion = data;
+														
+							STK500.getParm(STK500.constants.STK_SW_MAJOR, function(data) {
+								STK500.versionMajor = data;
+							
+								STK500.getParm(STK500.constants.STK_SW_MINOR, function(data) {
+									STK500.versionMinor = data;
+								
+									if (typeof STK500.initializeCallback == 'function') {
+										STK500.initializeCallback();
+									}
+								});
+							});
+						});
+					});
+					
+					
+				}, 500);
+			}, 500);
+		}, 500);
+	},
+
 
 };
 
@@ -160,23 +237,31 @@ var STK500 = {
 var protocol = STK500;
 var serialLogging = true;
 
+var readLen = 128;
 
 console.log("starting up!");
 
-var chromeSerialReadReady = function() {
+var chromeSerialReadCallbackArm = function(dataLen) {
 	if (!protocol.port) {
-		console.log("chromeSerialReadReady() called without active port");
+		console.log("chromeSerialReadCallbackArm() called without active port");
 		return;
 	}
 	
+	if (dataLen === undefined) {
+		readLen = 128;
+	} else {
+		readLen = dataLen;
+	}
+	
 	if (serialLogging = true) {
-		console.log("chromeSerialReadReady()");
+		console.log("chromeSerialReadCallbackArm(" + readLen + ")");
 	}
 	
 	// setup our read callback
-	chrome.serial.read(protocol.port.connectionId, 128, chromeSerialRead);
+	chrome.serial.read(protocol.port.connectionId, readLen, chromeSerialRead);
 };
 
+var readAgain = true;
 var chromeSerialRead = function(readData) {
 	if (!protocol.port) {
 		console.log("chromeSerialRead() called without active port");
@@ -190,27 +275,24 @@ var chromeSerialRead = function(readData) {
 		
 		// call the actual protocol recieve method
 		protocol.recieve(readData.data);
+		
+	} else {
+		chrome.serial.read(protocol.port.connectionId, readLen, chromeSerialRead);		
 	}
 	
-	chrome.serial.read(protocol.port.connectionId, 128, chromeSerialRead);
 };
 
-var chromeSerialWrite = function(writeData) {
+var chromeSerialWrite = function(data) {
 	if (!protocol.port) {
 		console.log("chromeSerialWrite() called without active port");
 		return;
 	}
 	
-	if (serialLogging = true) {
-		console.log("chromeSerialWrite(): " +  bufferToString(writeData));
+	if (serialLogging == true) {
+		console.log("chromeSerialWrite(): " +  bufferToString(data.buffer));
 	}
 	
-	// convert array in to a binary array as expected by chrome.serial.write
-	var data = new ArrayBuffer(writeData.length);
-	var dataView = new Uint8Array(data, 0, writeData.length);
-	dataView.set(writeData, 0);
-	
-	chrome.serial.write(protocol.port.connectionId, data, function() {}); 
+	chrome.serial.write(protocol.port.connectionId, data.buffer, function() {}); 
 };
 
 var chromeSerialFlush = function() {
@@ -219,7 +301,7 @@ var chromeSerialFlush = function() {
 		return;
 	}
 	
-	if (serialLogging = true) {
+	if (serialLogging == true) {
 		console.log("chromeSerialFlush()");
 	}
 	
@@ -232,7 +314,7 @@ var chromeSerialSetDTR_RTS = function(state) {
 		return;
 	}
 	
-	if (serialLogging = true) {
+	if (serialLogging == true) {
 		console.log("chromeSerialSetDTR_RTS(): " + state);
 	}
 	
@@ -245,7 +327,7 @@ var chromeSerialClose = function() {
 		return;
 	}
 	
-	if (serialLogging = true) {
+	if (serialLogging == true) {
 		console.log("chromeSerialClose()");
 	}
 	
@@ -298,10 +380,12 @@ chrome.serial.getPorts(function(ports) {
 		protocol.portFlush = chromeSerialFlush;
 		protocol.portSetDTR_RTS = chromeSerialSetDTR_RTS;
 		protocol.portClose = chromeSerialClose;
-		protocol.portReadReady = chromeSerialReadReady;
+		protocol.portReadCallbackArm = chromeSerialReadCallbackArm;		
 		
 		// initialize the protocol
-		protocol.initialize();
+		protocol.initialize(function() {
+			console.log("Initialized - Hardware Version: " + STK500.hardwareVersion + ", Firmware Version: " + STK500.versionMajor + "." + STK500.versionMinor);
+		});
 	});
 });
 
