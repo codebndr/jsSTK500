@@ -45,18 +45,8 @@ var STK500 = {
 		STK_SW_MINOR: 			0x82
 	},
 	
-	states: {
-		INITIALIZING: 			0,
-		WAITING: 				1,
-		READING: 				2,
-		RESULT_READY: 			3,
-		TIMEOUT_OCCURRED: 		4,
-		STOPPED: 				5,
-		FAIL: 					6
-	},
 	
-	
-	// states + settings
+	// settings
 	port:  						false,
 	baudrate: 					57600,
 	
@@ -73,9 +63,7 @@ var STK500 = {
 	highFuses: 					0xDA,
 	extendedFuses: 				0xF5,
 	
-	
-	currentState: 				0,
-	
+		
 	// board info
 	hardwareVersion: 			0,
 	versionMajor: 				0,
@@ -163,9 +151,7 @@ var STK500 = {
 		if (typeof callback == 'function') {
 			STK500.initializeCallback = callback;
 		}
-		
-		STK500.currentState = STK500.states.INITIALIZING;
-				
+						
 		// this setTimeout stuff is pretty ghetto, but its the only way to have "sleeping"
 		setTimeout(function() {
 			// object is used literally instead of "this", when using timeout callbacks
@@ -184,10 +170,9 @@ var STK500 = {
 					// first send and flush a few times (yes.. they actually do this in avrdude...)
 					STK500.send(buffer);
 					STK500.send(buffer);
-										
-					// update our state
-					STK500.currentState = STK500.states.WAITING;
-					STK500.portReadCallbackArm(2); // enable the serial port read callback, with 2 byte length
+					
+					// enable the serial port read callback, with 2 byte length				
+					STK500.portReadCallbackArm(2); 
 				
 					// send the sync request for the last time, and wait for the recieve callback to fire
 					STK500.send(buffer, function(buffer) {
@@ -261,7 +246,6 @@ var chromeSerialReadCallbackArm = function(dataLen) {
 	chrome.serial.read(protocol.port.connectionId, readLen, chromeSerialRead);
 };
 
-var readAgain = true;
 var chromeSerialRead = function(readData) {
 	if (!protocol.port) {
 		console.log("chromeSerialRead() called without active port");
