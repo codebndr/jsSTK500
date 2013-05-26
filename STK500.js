@@ -253,29 +253,29 @@ var STK500 = {
 												buffer[5] = 1; /* polling supported */
 												buffer[6] = 1; /* programming is self-timed */
 												buffer[7] = roughSizeOfObject(STK500.lockBits);
-												
+
 												// number of fuse bytes
 												buffer[8] = 0;
 												buffer[8] += roughSizeOfObject(STK500.lowFuses);
 												buffer[8] += roughSizeOfObject(STK500.highFuses);
 												buffer[8] += roughSizeOfObject(STK500.extendedFuses);
-												
+
 												// TODO flash related sizes
 												buffer[9]  = 0xff;
-											    buffer[10]  = 0xff;
-											    buffer[13] = 0;
-											    buffer[14] = 0;
-											    buffer[17] = 0;
-											    buffer[18] = 0;
-											    buffer[19] = 0;
-											    buffer[20] = 0;
-												
+												buffer[10]  = 0xff;
+												buffer[13] = 0;
+												buffer[14] = 0;
+												buffer[17] = 0;
+												buffer[18] = 0;
+												buffer[19] = 0;
+												buffer[20] = 0;
+
 												// TODO EEPROM related sizes
 												buffer[11] = 0xff;
-											    buffer[12] = 0xff;
-											    buffer[15] = 0;
-											    buffer[16] = 0;
-												
+												buffer[12] = 0xff;
+												buffer[15] = 0;
+												buffer[16] = 0;
+
 												buffer[21] = STK500.constants.CRC_EOP;
 												
 												// enable the serial port read callback, with 2 byte length				
